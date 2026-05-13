@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build
+        run: |
+          swift build -c release --product SpotTerminal --arch arm64
+          swift build -c release --product SpotTerminal --arch x86_64
+
+      - name: Test
+        run: swift test
+
+      - name: Package DMG
+        run: UNIVERSAL=1 APP_VERSION=${{ steps.version.outputs.version }} ./script/build_and_run.sh --dmg
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpotTerminal-${{ steps.version.outputs.version }}
+          path: dist/SpotTerminal-${{ steps.version.outputs.version }}.dmg
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/SpotTerminal-${{ steps.version.outputs.version }}.dmg
+          generate_release_notes: true

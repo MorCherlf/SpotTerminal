@@ -1,0 +1,29 @@
+# Build artifacts
+.build/
+dist/
+DerivedData/
+.swiftpm/
+xcuserdata/
+*.xcodeproj
+*.xcworkspace
+
+# Test / coverage artifacts
+*.profraw
+*.profdata
+
+# System
+.DS_Store
+
+# Agent / AI tooling
+# Ignored by default so public contributors don't commit them.
+# In the dev repo, negated below so new files are auto-tracked.
+CLAUDE.md
+.claude/**
+.agent-docs/**
+.codex/**
+script/release.sh
+
+# Dev repo: un-ignore agent directory contents
+!.claude/**/*
+!.agent-docs/**/*
+!.codex/**/*
