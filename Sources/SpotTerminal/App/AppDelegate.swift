@@ -18,11 +18,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         PrivacySafeLogger.shared.event("app_launched")
-        if ProcessInfo.processInfo.arguments.contains("--ci-smoke-test") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                NSApp.terminate(nil)
-            }
-        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

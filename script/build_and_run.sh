@@ -143,25 +143,32 @@ verify_app_launch() {
 
   echo "Verifying packaged app launches..."
   local timeout_seconds="${APP_LAUNCH_TIMEOUT:-30}"
+  local settle_seconds="${APP_LAUNCH_SETTLE_SECONDS:-5}"
   local start_seconds
+  local app_pid=""
   start_seconds="$(date +%s)"
-  /usr/bin/open -W -n "$APP_BUNDLE" --args --ci-smoke-test &
-  local open_pid=$!
 
-  while kill -0 "$open_pid" >/dev/null 2>&1; do
+  if ! /usr/bin/open -n "$APP_BUNDLE"; then
+    echo "Packaged app launch verification failed: open returned an error" >&2
+    exit 1
+  fi
+
+  while [[ -z "$app_pid" ]]; do
     if (( $(date +%s) - start_seconds > timeout_seconds )); then
-      echo "Packaged app launch verification timed out after ${timeout_seconds}s" >&2
+      echo "Packaged app launch verification timed out waiting for process after ${timeout_seconds}s" >&2
       pkill -x "$APP_NAME" >/dev/null 2>&1 || true
-      wait "$open_pid" >/dev/null 2>&1 || true
       exit 1
     fi
+    app_pid="$(pgrep -x "$APP_NAME" | head -n 1 || true)"
     sleep 1
   done
 
-  if ! wait "$open_pid"; then
-    echo "Packaged app launch verification failed" >&2
+  sleep "$settle_seconds"
+  if ! kill -0 "$app_pid" >/dev/null 2>&1; then
+    echo "Packaged app launch verification failed: app exited during launch smoke test" >&2
     exit 1
   fi
+  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 }
 
 open_app() {
