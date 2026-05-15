@@ -23,11 +23,6 @@ jobs:
       - name: Show Swift version
         run: swift --version
 
-      - name: Build
-        run: |
-          swift build -c release --product SpotTerminal --arch arm64
-          swift build -c release --product SpotTerminal --arch x86_64
-
       - name: Test
         run: swift test
 

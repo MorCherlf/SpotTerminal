@@ -95,11 +95,25 @@ final class AppLocalizer {
         if let cached = cache[code] {
             return cached
         }
-        guard let url = Bundle.module.url(forResource: "Localizable", withExtension: "strings", subdirectory: "\(code).lproj"),
+        guard let url = localizationResourceURL(for: code),
               let dictionary = NSDictionary(contentsOf: url) as? [String: String] else {
             return nil
         }
         cache[code] = dictionary
         return dictionary
+    }
+
+    private func localizationResourceURL(for code: String) -> URL? {
+        let localizedPath = "\(code).lproj/Localizable.strings"
+        let candidates = [
+            Bundle.main.resourceURL?.appendingPathComponent(localizedPath),
+            Bundle.main.resourceURL?.appendingPathComponent("SpotTerminal_SpotTerminal.bundle/\(localizedPath)"),
+        ]
+        if let url = candidates.compactMap({ $0 }).first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
+            return url
+        }
+
+        guard Bundle.main.bundleURL.pathExtension != "app" else { return nil }
+        return Bundle.module.url(forResource: "Localizable", withExtension: "strings", subdirectory: "\(code).lproj")
     }
 }

@@ -31,6 +31,8 @@ Environment:
   SIGN_IDENTITY    codesign identity, defaults to ad-hoc signing (-)
   BUILD_NUMBER     CFBundleVersion, defaults to 1
   UNIVERSAL         set to 1 to build a universal arm64/x86_64 app
+  SKIP_APP_LAUNCH_VERIFY
+                    set to 1 to skip packaged app launch verification
 USAGE
 }
 
@@ -118,17 +120,63 @@ PLIST
 
 /usr/bin/codesign --force --sign "$SIGN_IDENTITY" "$APP_BUNDLE" >/dev/null
 
+verify_bundle_resources() {
+  local missing=0
+  local resource_bundle
+  for resource_bundle in SpotTerminal_SpotTerminal.bundle SwiftTerm_SwiftTerm.bundle; do
+    if [[ ! -d "$APP_RESOURCES/$resource_bundle" ]]; then
+      echo "Missing SwiftPM resource bundle: $APP_RESOURCES/$resource_bundle" >&2
+      missing=1
+    fi
+  done
+  if [[ "$missing" != "0" ]]; then
+    exit 1
+  fi
+}
+
+verify_bundle_resources
+
+verify_app_launch() {
+  if [[ "${SKIP_APP_LAUNCH_VERIFY:-0}" == "1" ]]; then
+    return
+  fi
+
+  echo "Verifying packaged app launches..."
+  local timeout_seconds="${APP_LAUNCH_TIMEOUT:-30}"
+  local start_seconds
+  start_seconds="$(date +%s)"
+  /usr/bin/open -W -n "$APP_BUNDLE" --args --ci-smoke-test &
+  local open_pid=$!
+
+  while kill -0 "$open_pid" >/dev/null 2>&1; do
+    if (( $(date +%s) - start_seconds > timeout_seconds )); then
+      echo "Packaged app launch verification timed out after ${timeout_seconds}s" >&2
+      pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+      wait "$open_pid" >/dev/null 2>&1 || true
+      exit 1
+    fi
+    sleep 1
+  done
+
+  if ! wait "$open_pid"; then
+    echo "Packaged app launch verification failed" >&2
+    exit 1
+  fi
+}
+
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
 }
 
 package_zip() {
+  verify_app_launch
   rm -f "$ZIP_PATH"
   (cd "$DIST_DIR" && /usr/bin/ditto -c -k --keepParent "$APP_NAME.app" "$ZIP_PATH")
   echo "$ZIP_PATH"
 }
 
 package_dmg() {
+  verify_app_launch
   rm -f "$DMG_PATH"
   rm -rf "$DMG_STAGING"
   mkdir -p "$DMG_STAGING/.background"
@@ -229,9 +277,7 @@ case "$MODE" in
     /usr/bin/log stream --info --style compact --predicate "subsystem == \"$BUNDLE_ID\""
     ;;
   --verify|verify)
-    open_app
-    sleep 1
-    pgrep -x "$APP_NAME" >/dev/null
+    verify_app_launch
     ;;
   --zip|zip)
     package_zip
